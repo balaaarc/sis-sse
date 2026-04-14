@@ -71,16 +71,16 @@ async function main() {
     new OpticalGenerator({ sensorId: 'S07-THR-001', modality: 'THERMAL',   intervalMs: 40,   site }),
     new OpticalGenerator({ sensorId: 'S08-PTZ-001', modality: 'PTZ',       intervalMs: 40,   site }),
     new OpticalGenerator({ sensorId: 'S10-CCV-001', modality: 'CCTV',      intervalMs: 40,   site }),
-    new OpticalGenerator({ sensorId: 'S12-PIR-001', modality: 'PIR',       intervalMs: 100,  site }),
+    new OpticalGenerator({ sensorId: 'S12-PIR-001', modality: 'PIR_IR',    intervalMs: 100,  site }),
     new OpticalGenerator({ sensorId: 'S15-TNV-001', modality: 'THERMAL_NV',intervalMs: 40,   site }),
-    new OpticalGenerator({ sensorId: 'S16-NIR-001', modality: 'NIR',       intervalMs: 40,   site }),
+    new OpticalGenerator({ sensorId: 'S16-NIR-001', modality: 'NIR_VISIBLE',intervalMs: 40,   site }),
 
     // Radar / LiDAR / mmWave / GMTI / Microwave
     new RadarGenerator({ sensorId: 'S01-GPR-001', modality: 'GPR',         intervalMs: 10000, site }),
     new RadarGenerator({ sensorId: 'S11-MWB-001', modality: 'MICROWAVE',   intervalMs: 100,   site }),
     new RadarGenerator({ sensorId: 'S13-LID-001', modality: 'LIDAR',       intervalMs: 100,   site }),
     new RadarGenerator({ sensorId: 'S17-MMW-001', modality: 'MMWAVE',      intervalMs: 100,   site }),
-    new RadarGenerator({ sensorId: 'S18-GMT-001', modality: 'GMTI',        intervalMs: 100,   site }),
+    new RadarGenerator({ sensorId: 'S18-GMT-001', modality: 'GMTI_RADAR',  intervalMs: 100,   site }),
 
     // Magnetic
     new MagneticGenerator({ sensorId: 'S04-MAD-001', modality: 'MAD',          intervalMs: 1000, site }),

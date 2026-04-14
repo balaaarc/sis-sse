@@ -38,7 +38,8 @@ const MODALITY_BASE_COLOR = {
   PTZ:        { r: 45,  g: 75,  b: 145 },  // navy daylight (brighter)
   CCTV:       { r: 60,  g: 60,  b: 75  },  // dark grey (brighter)
   THERMAL_NV: { r: 45,  g: 25,  b: 110 },  // purple NV (brighter)
-  NIR_VISIBLE:{ r: 15,  g: 90,  b: 30  },  // bright green NIR
+  NIR_VISIBLE: { r: 15,  g: 90,  b: 30  },
+  PIR_IR:      { r: 180, g: 40,  b: 10  },  // bright green NIR
 };
 
 // Generate a synthetic noise frame asynchronously
