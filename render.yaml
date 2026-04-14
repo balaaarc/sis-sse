@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sis-sse
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true

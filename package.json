@@ -1,0 +1,31 @@
+{
+  "name": "iinvsys-sse",
+  "version": "1.0.0",
+  "description": "IINVSYS SIS Sensor Simulation Engine - generates synthetic sensor data for the surveillance dashboard",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop iinvsys-sse",
+    "pm2:restart": "pm2 restart iinvsys-sse",
+    "pm2:logs": "pm2 logs iinvsys-sse"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "fastify": "^4.28.1",
+    "@fastify/cors": "^9.0.1",
+    "sharp": "^0.33.4",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "pm2": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

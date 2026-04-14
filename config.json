@@ -1,0 +1,17 @@
+{
+  "ws_port": 4000,
+  "rest_port": 4001,
+  "default_scenario": "NORMAL",
+  "ring_buffer_seconds": 60,
+  "noise": {
+    "seismic_sigma": 0.02,
+    "acoustic_sigma": 2.5,
+    "radar_sigma": 1.5
+  },
+  "dropout_rate": 0.02,
+  "sites": [
+    { "site_id": "BOP-ALPHA-01", "bop_id": "BOP-001", "lat": 21.9452, "lon": 88.1234 },
+    { "site_id": "BOP-BETA-01",  "bop_id": "BOP-002", "lat": 21.9812, "lon": 88.2156 }
+  ],
+  "cors_origins": ["http://localhost:3000", "http://localhost:5173", "https://balaaarc.github.io"]
+}
