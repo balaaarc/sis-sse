@@ -1,82 +1,68 @@
-/**
- * acoustic.js
- * Covers S03 Acoustic Array — 10 Hz (100ms interval).
- *
- * raw_value schema:
- *   spl_db            – sound pressure level dB
- *   angle_of_arrival  – 0-360 degrees from north
- *   classification    – GUNSHOT|VEHICLE|HUMAN_VOICE|ANIMAL|MACHINERY|EXPLOSION|AMBIENT
- *   confidence        – 0-1
- *   frequency_profile – 128 floats mel-spectrogram dB
- *   event_duration_ms – integer milliseconds
- */
-
 import { BaseGenerator } from './base.js';
 import { scenarioManager } from '../scenarioManager.js';
+import type { GeneratorOpts, GenerateResult } from '../types.js';
 
-const CLASSIFICATIONS = [
-  'GUNSHOT', 'VEHICLE', 'HUMAN_VOICE', 'ANIMAL', 'MACHINERY', 'EXPLOSION', 'AMBIENT'
-];
+type AcousticClass = 'GUNSHOT' | 'VEHICLE' | 'HUMAN_VOICE' | 'ANIMAL' | 'MACHINERY' | 'EXPLOSION' | 'AMBIENT';
 
 export class AcousticGenerator extends BaseGenerator {
-  constructor(opts) {
+  constructor(opts: GeneratorOpts) {
     super({ noiseSigma: 0.03, ...opts });
   }
 
-  /** Generate 128 mel-spectrogram dB bins with a dominant frequency band */
-  #melSpectrogram(peakBin, peakAmplitude) {
+  #melSpectrogram(peakBin: number, peakAmplitude: number): number[] {
     return Array.from({ length: 128 }, (_, i) => {
       const dist = Math.abs(i - peakBin);
-      const val = peakAmplitude - dist * 0.5 + this.gaussian(3);
+      const val  = peakAmplitude - dist * 0.5 + this.gaussian(3);
       return +Math.max(-80, Math.min(0, val)).toFixed(2);
     });
   }
 
-  generate() {
+  generate(): GenerateResult {
     const scenario = scenarioManager.getScenario();
 
-    let splBase, classification, confidence, aoaBase, aoaRange, durationMs;
+    let splBase: number;
+    let classification: AcousticClass;
+    let confidence: number;
+    let aoaBase: number;
+    let aoaRange: number;
+    let durationMs: number;
 
     switch (scenario) {
       case 'INTRUSION':
-        splBase        = 65 + Math.random() * 25;           // 65-90 dB
+        splBase        = 65 + Math.random() * 25;
         classification = Math.random() < 0.55 ? 'HUMAN_VOICE' : 'GUNSHOT';
         confidence     = 0.75 + Math.random() * 0.20;
         aoaBase        = 135;
-        aoaRange       = 45;                                  // 135-180 degrees
+        aoaRange       = 45;
         durationMs     = 200 + Math.floor(Math.random() * 1800);
         break;
-
       case 'DRONE':
-        splBase        = 50 + Math.random() * 20;           // 50-70 dB
+        splBase        = 50 + Math.random() * 20;
         classification = 'MACHINERY';
         confidence     = 0.70 + Math.random() * 0.20;
         aoaBase        = Math.random() * 360;
         aoaRange       = 0;
         durationMs     = 5000 + Math.floor(Math.random() * 10000);
         break;
-
       case 'VEHICLE_CONVOY':
-        splBase        = 70 + Math.random() * 20;           // 70-90 dB
+        splBase        = 70 + Math.random() * 20;
         classification = 'VEHICLE';
         confidence     = 0.80 + Math.random() * 0.15;
         aoaBase        = Math.random() * 360;
         aoaRange       = 0;
         durationMs     = 10000 + Math.floor(Math.random() * 30000);
         break;
-
       case 'TUNNEL_ACTIVITY':
-        splBase        = 40 + Math.random() * 20;           // 40-60 dB
+        splBase        = 40 + Math.random() * 20;
         classification = 'MACHINERY';
         confidence     = 0.50 + Math.random() * 0.20;
         aoaBase        = Math.random() * 360;
         aoaRange       = 0;
         durationMs     = 30000 + Math.floor(Math.random() * 60000);
         break;
-
       case 'ELEVATED': {
-        splBase        = 50 + Math.random() * 25;           // 50-75 dB
-        const mixedClasses = ['VEHICLE', 'HUMAN_VOICE', 'ANIMAL', 'MACHINERY', 'AMBIENT'];
+        const mixedClasses: AcousticClass[] = ['VEHICLE', 'HUMAN_VOICE', 'ANIMAL', 'MACHINERY', 'AMBIENT'];
+        splBase        = 50 + Math.random() * 25;
         classification = mixedClasses[Math.floor(Math.random() * mixedClasses.length)];
         confidence     = 0.40 + Math.random() * 0.45;
         aoaBase        = Math.random() * 360;
@@ -84,9 +70,8 @@ export class AcousticGenerator extends BaseGenerator {
         durationMs     = 300 + Math.floor(Math.random() * 3000);
         break;
       }
-
-      default: // NORMAL
-        splBase        = 30 + Math.random() * 35;           // 30-65 dB
+      default:
+        splBase        = 30 + Math.random() * 35;
         classification = Math.random() < 0.65 ? 'AMBIENT' : 'ANIMAL';
         confidence     = 0.30 + Math.random() * 0.30;
         aoaBase        = Math.random() * 360;
@@ -96,25 +81,23 @@ export class AcousticGenerator extends BaseGenerator {
     }
 
     const spl_db = +this.clamp(
-      splBase + this.gaussian(splBase * 0.05),
-      0, 120
+      splBase + this.gaussian(splBase * 0.05), 0, 120
     ).toFixed(2);
 
     const angle_of_arrival = +(
       (aoaBase + Math.random() * aoaRange + this.gaussian(5) + 360) % 360
     ).toFixed(1);
 
-    // Map classification to dominant mel bin
-    const classToMelPeak = {
+    const classToMelPeak: Record<AcousticClass, number> = {
       GUNSHOT:     110,
       EXPLOSION:   105,
       VEHICLE:      60,
       MACHINERY:    55,
       HUMAN_VOICE:  35,
       ANIMAL:       28,
-      AMBIENT:      15
+      AMBIENT:      15,
     };
-    const peakBin = classToMelPeak[classification] ?? 20;
+    const peakBin       = classToMelPeak[classification] ?? 20;
     const peakAmplitude = -40 + (spl_db - 30) * 0.5;
 
     const rawValue = {
@@ -123,7 +106,7 @@ export class AcousticGenerator extends BaseGenerator {
       classification,
       confidence:        +confidence.toFixed(3),
       frequency_profile: this.#melSpectrogram(peakBin, peakAmplitude),
-      event_duration_ms: durationMs
+      event_duration_ms: durationMs,
     };
 
     const isAlert = spl_db > 85 || classification === 'GUNSHOT' || classification === 'EXPLOSION';
@@ -132,7 +115,7 @@ export class AcousticGenerator extends BaseGenerator {
           event_detected:  true,
           classification,
           confidence:      +confidence.toFixed(3),
-          alert_priority:  isAlert ? 'HIGH' : spl_db > 65 ? 'MEDIUM' : 'LOW'
+          alert_priority:  isAlert ? 'HIGH' : spl_db > 65 ? 'MEDIUM' : 'LOW',
         }
       : { event_detected: false };
 

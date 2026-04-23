@@ -1,169 +1,153 @@
-/**
- * wsServer.js
- * WebSocket server on port 4000.
- *
- * Outbound message types (SSE → Dashboard):
- *   SENSOR_DATA | AIML_DETECTION | AIML_TRACK_UPDATE | AIML_ALERT
- *   THREAT_ASSESSMENT | SYSTEM_HEALTH | SCENARIO_CHANGE
- *
- * Inbound message types (Dashboard → SSE):
- *   PTZ_CONTROL | ACKNOWLEDGE_ALERT | SUBSCRIBE
- */
-
 import { WebSocketServer, WebSocket } from 'ws';
+import type { IncomingMessage } from 'http';
+import type { Server } from 'http';
 import { v4 as uuidv4 } from 'uuid';
 import { scenarioManager } from './scenarioManager.js';
 import { logger } from './logger.js';
+import type { AppConfig, WsMessage, IWsServer, IRingBuffer, AckDetail } from './types.js';
 
-// Ring buffer keyed by sensor_id
-class RingBuffer {
-  #buffers = new Map();
-  #maxAge;
+interface ExtWebSocket extends WebSocket {
+  _clientId: string;
+}
+
+class RingBuffer implements IRingBuffer {
+  #buffers = new Map<string, Array<{ ts: number; message: WsMessage }>>();
+  #maxAge: number;
 
   constructor(ringBufferSeconds = 60) {
     this.#maxAge = ringBufferSeconds * 1000;
   }
 
-  push(sensorId, message) {
+  push(sensorId: string, message: WsMessage): void {
     if (!this.#buffers.has(sensorId)) this.#buffers.set(sensorId, []);
-    const buf = this.#buffers.get(sensorId);
+    const buf = this.#buffers.get(sensorId)!;
     buf.push({ ts: Date.now(), message });
-    // evict entries older than maxAge
     const cutoff = Date.now() - this.#maxAge;
     while (buf.length > 0 && buf[0].ts < cutoff) buf.shift();
   }
 
-  getRecent(sensorId) {
+  getRecent(sensorId: string): WsMessage[] {
     return (this.#buffers.get(sensorId) ?? []).map((e) => e.message);
   }
 
-  getAllRecent() {
-    const out = [];
+  getAllRecent(): WsMessage[] {
+    const out: WsMessage[] = [];
     for (const entries of this.#buffers.values()) {
       for (const e of entries) out.push(e.message);
     }
     return out.sort((a, b) => {
-      const ta = a?.payload?.timestamp ?? '';
-      const tb = b?.payload?.timestamp ?? '';
+      const ta = (a?.payload as Record<string, string>)?.timestamp ?? '';
+      const tb = (b?.payload as Record<string, string>)?.timestamp ?? '';
       return ta < tb ? -1 : ta > tb ? 1 : 0;
     });
   }
 }
 
-// Acknowledged alerts store (in-memory)
-const acknowledgedAlerts = new Map();
+const acknowledgedAlerts = new Map<string, AckDetail>();
 
-export function createWsServer(config, httpServer) {
-  // Attach to a shared HTTP server so WS and REST share a single port
+export function createWsServer(config: AppConfig, httpServer: Server): IWsServer {
   const wss = new WebSocketServer({ server: httpServer });
-  const clients = new Set();
+  const clients = new Set<ExtWebSocket>();
   const ringBuffer = new RingBuffer(config.ring_buffer_seconds ?? 60);
+  const subscriptions = new Map<ExtWebSocket, Set<string>>();
 
-  // Track per-client subscriptions: Map<ws, Set<modality>>
-  const subscriptions = new Map();
-
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', (ws: WebSocket, _req: IncomingMessage) => {
+    const extWs = ws as ExtWebSocket;
     const clientId = uuidv4();
-    ws._clientId = clientId;
-    clients.add(ws);
-    subscriptions.set(ws, new Set()); // empty = all modalities
+    extWs._clientId = clientId;
+    clients.add(extWs);
+    subscriptions.set(extWs, new Set());
 
     logger.info({ clientId, total: clients.size }, 'Client connected');
 
-    // Send welcome + recent ring buffer on connect
-    safeSend(ws, {
+    safeSend(extWs, {
       type: 'CONNECTED',
       payload: {
         client_id: clientId,
         scenario: scenarioManager.getScenario(),
-        server_time: new Date().toISOString()
-      }
+        server_time: new Date().toISOString(),
+      },
     });
 
-    // Replay last 10 sensor readings from ring buffer
     const recent = ringBuffer.getAllRecent().slice(-10);
-    for (const msg of recent) {
-      safeSend(ws, msg);
-    }
+    for (const msg of recent) safeSend(extWs, msg);
 
-    ws.on('message', (raw) => {
-      let msg;
+    extWs.on('message', (raw: Buffer) => {
+      let msg: { type: string; payload: Record<string, unknown> };
       try {
-        msg = JSON.parse(raw.toString());
+        msg = JSON.parse(raw.toString()) as typeof msg;
       } catch {
-        safeSend(ws, { type: 'ERROR', payload: { message: 'Invalid JSON' } });
+        safeSend(extWs, { type: 'ERROR', payload: { message: 'Invalid JSON' } });
         return;
       }
-      handleInbound(ws, msg, config);
+      handleInbound(extWs, msg);
     });
 
-    ws.on('close', () => {
-      clients.delete(ws);
-      subscriptions.delete(ws);
+    extWs.on('close', () => {
+      clients.delete(extWs);
+      subscriptions.delete(extWs);
       logger.info({ clientId, total: clients.size }, 'Client disconnected');
     });
 
-    ws.on('error', (err) => {
+    extWs.on('error', (err: Error) => {
       logger.error({ clientId, err: err.message }, 'Client error');
     });
   });
 
-  wss.on('error', (err) => {
+  wss.on('error', (err: Error) => {
     logger.error(err, 'WS server error');
   });
 
-  // Listen for scenario changes to broadcast SCENARIO_CHANGE
-  scenarioManager.on('scenario_change', (detail) => {
+  scenarioManager.on('scenario_change', (detail: unknown) => {
     broadcast({ type: 'SCENARIO_CHANGE', payload: detail });
   });
 
-  /**
-   * Broadcast a message to all connected clients.
-   * Respects per-client modality subscriptions.
-   */
-  function broadcast(message) {
+  function broadcast(message: WsMessage): void {
     const raw = JSON.stringify(message);
-    const modality = message?.payload?.modality ?? null;
+    const modality = (message?.payload as Record<string, string> | null)?.modality ?? null;
 
     for (const ws of clients) {
       if (ws.readyState !== WebSocket.OPEN) continue;
-      // Subscription filter: if client has subscribed to specific modalities
       const subs = subscriptions.get(ws);
       if (modality && subs && subs.size > 0 && !subs.has(modality)) continue;
       ws.send(raw);
     }
 
-    // Add sensor data to ring buffer
-    if (message.type === 'SENSOR_DATA' && message.payload?.sensor_id) {
-      ringBuffer.push(message.payload.sensor_id, message);
+    const payload = message.payload as Record<string, unknown> | null;
+    if (message.type === 'SENSOR_DATA' && payload?.sensor_id) {
+      ringBuffer.push(payload.sensor_id as string, message);
     }
   }
 
-  /**
-   * Handle messages from the dashboard.
-   */
-  function handleInbound(ws, msg, config) {
+  function handleInbound(
+    ws: ExtWebSocket,
+    msg: { type: string; payload: Record<string, unknown> }
+  ): void {
     const { type, payload } = msg;
 
     switch (type) {
       case 'PTZ_CONTROL': {
         const { cameraId, command } = payload ?? {};
         logger.info({ cameraId, command }, 'PTZ_CONTROL received');
-        // Acknowledge back to sender
         safeSend(ws, {
           type: 'PTZ_ACK',
-          payload: { cameraId, command, ack: true, timestamp: new Date().toISOString() }
+          payload: { cameraId, command, ack: true, timestamp: new Date().toISOString() },
         });
         break;
       }
 
       case 'ACKNOWLEDGE_ALERT': {
         const { alertId, user, comment } = payload ?? {};
-        acknowledgedAlerts.set(alertId, { alertId, user, comment, ack_time: new Date().toISOString() });
+        acknowledgedAlerts.set(alertId as string, {
+          alertId: alertId as string,
+          user: user as string,
+          comment: comment as string,
+          ack_time: new Date().toISOString(),
+        });
         logger.info({ alertId, user }, 'Alert acknowledged');
         broadcast({
           type: 'ALERT_ACKNOWLEDGED',
-          payload: { alertId, user, comment, timestamp: new Date().toISOString() }
+          payload: { alertId, user, comment, timestamp: new Date().toISOString() },
         });
         break;
       }
@@ -171,17 +155,17 @@ export function createWsServer(config, httpServer) {
       case 'SUBSCRIBE': {
         const { filters } = payload ?? {};
         const subs = subscriptions.get(ws);
-        if (Array.isArray(filters) && filters.length > 0) {
+        if (subs && Array.isArray(filters) && filters.length > 0) {
           subs.clear();
-          filters.forEach((f) => subs.add(f));
+          (filters as string[]).forEach((f) => subs.add(f));
           logger.info({ clientId: ws._clientId, filters }, 'Client subscribed to modalities');
-        } else {
-          subs.clear(); // subscribe to all
+        } else if (subs) {
+          subs.clear();
           logger.info({ clientId: ws._clientId }, 'Client subscribed to ALL');
         }
         safeSend(ws, {
           type: 'SUBSCRIBE_ACK',
-          payload: { filters: filters ?? [], timestamp: new Date().toISOString() }
+          payload: { filters: filters ?? [], timestamp: new Date().toISOString() },
         });
         break;
       }
@@ -191,13 +175,13 @@ export function createWsServer(config, httpServer) {
     }
   }
 
-  function safeSend(ws, message) {
+  function safeSend(ws: ExtWebSocket, message: WsMessage): void {
     try {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(message));
       }
     } catch (err) {
-      logger.error({ err: err.message }, 'safeSend error');
+      logger.error({ err: (err as Error).message }, 'safeSend error');
     }
   }
 
@@ -206,6 +190,6 @@ export function createWsServer(config, httpServer) {
     broadcast,
     getClientCount: () => clients.size,
     getAcknowledgedAlerts: () => acknowledgedAlerts,
-    getRingBuffer: () => ringBuffer
+    getRingBuffer: () => ringBuffer,
   };
 }
