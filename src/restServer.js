@@ -13,7 +13,9 @@
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import scenarioManager from './scenarioManager.js';
+import { z } from 'zod';
+import { logger } from './logger.js';
+import { scenarioManager } from './scenarioManager.js';
 
 // In-memory alert store (also populated by correlator via wsServer broadcast interception)
 export const alertStore = [];
@@ -39,7 +41,15 @@ export function updateSensorReading(sensorId, payload) {
   }
 }
 
+// ── Zod schemas ─────────────────────────────────────────────────────────────
+const ScenarioBody = z.object({ scenario: z.string().min(1) });
+const SensorIdParam = z.object({ id: z.string().min(1) });
+
 export async function createRestServer(config, wsServer, httpServer) {
+  if (!process.env.SSE_API_KEY) {
+    logger.warn('SSE_API_KEY not set — REST API is unauthenticated');
+  }
+
   // Use serverFactory so Fastify shares the same HTTP server as the WS server
   const app = Fastify({
     logger: false,
@@ -57,6 +67,18 @@ export async function createRestServer(config, wsServer, httpServer) {
   await app.register(cors, {
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'OPTIONS']
+  });
+
+  // ── API key auth hook ────────────────────────────────────────────────────
+  app.addHook('preHandler', async (req, reply) => {
+    if (req.url.startsWith('/api/health')) return;
+    const apiKey = process.env.SSE_API_KEY;
+    if (!apiKey) return; // dev mode — unauthenticated, warned at startup
+    const authHeader = req.headers['authorization'] ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (token !== apiKey) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
   });
 
   // ── GET /api/health ─────────────────────────────────────────────────────
@@ -93,7 +115,9 @@ export async function createRestServer(config, wsServer, httpServer) {
 
   // ── GET /api/sensors/:id/history ────────────────────────────────────────
   app.get('/api/sensors/:id/history', async (req, reply) => {
-    const { id } = req.params;
+    const paramResult = SensorIdParam.safeParse(req.params);
+    if (!paramResult.success) return reply.code(400).send({ error: 'Invalid sensor id' });
+    const { id } = paramResult.data;
     if (!sensorRegistry.has(id)) {
       return reply.code(404).send({ error: `Sensor ${id} not found` });
     }
@@ -153,18 +177,12 @@ export async function createRestServer(config, wsServer, httpServer) {
   });
 
   // ── POST /api/scenario ──────────────────────────────────────────────────
-  app.post('/api/scenario', {
-    schema: {
-      body: {
-        type: 'object',
-        required: ['scenario'],
-        properties: {
-          scenario: { type: 'string' }
-        }
-      }
+  app.post('/api/scenario', async (req, reply) => {
+    const result = ScenarioBody.safeParse(req.body);
+    if (!result.success) {
+      return reply.code(400).send({ error: result.error.issues });
     }
-  }, async (req, reply) => {
-    const { scenario } = req.body;
+    const { scenario } = result.data;
     try {
       scenarioManager.setScenario(scenario);
       // Broadcast scenario change via WS

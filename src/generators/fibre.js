@@ -12,7 +12,7 @@
  */
 
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 const ZONES        = ['ZONE-A', 'ZONE-B', 'ZONE-C', 'ZONE-D'];
 const EVENT_TYPES  = ['NONE', 'FOOTSTEP', 'VEHICLE', 'CUT_ATTEMPT', 'VIBRATION'];
@@ -21,7 +21,7 @@ const EVENT_TYPES  = ['NONE', 'FOOTSTEP', 'VEHICLE', 'CUT_ATTEMPT', 'VIBRATION']
 let _activeDistance = null;
 let _activeZone     = null;
 
-export default class FibreGenerator extends BaseGenerator {
+export class FibreGenerator extends BaseGenerator {
   constructor(opts) {
     super({ noiseSigma: 0.01, ...opts });
   }

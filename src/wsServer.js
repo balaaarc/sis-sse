@@ -12,7 +12,8 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import scenarioManager from './scenarioManager.js';
+import { scenarioManager } from './scenarioManager.js';
+import { logger } from './logger.js';
 
 // Ring buffer keyed by sensor_id
 class RingBuffer {
@@ -67,7 +68,7 @@ export function createWsServer(config, httpServer) {
     clients.add(ws);
     subscriptions.set(ws, new Set()); // empty = all modalities
 
-    console.log(`[WS] Client connected: ${clientId} (total: ${clients.size})`);
+    logger.info({ clientId, total: clients.size }, 'Client connected');
 
     // Send welcome + recent ring buffer on connect
     safeSend(ws, {
@@ -99,16 +100,16 @@ export function createWsServer(config, httpServer) {
     ws.on('close', () => {
       clients.delete(ws);
       subscriptions.delete(ws);
-      console.log(`[WS] Client disconnected: ${clientId} (total: ${clients.size})`);
+      logger.info({ clientId, total: clients.size }, 'Client disconnected');
     });
 
     ws.on('error', (err) => {
-      console.error(`[WS] Client error (${clientId}):`, err.message);
+      logger.error({ clientId, err: err.message }, 'Client error');
     });
   });
 
   wss.on('error', (err) => {
-    console.error('[WS] Server error:', err);
+    logger.error(err, 'WS server error');
   });
 
   // Listen for scenario changes to broadcast SCENARIO_CHANGE
@@ -147,7 +148,7 @@ export function createWsServer(config, httpServer) {
     switch (type) {
       case 'PTZ_CONTROL': {
         const { cameraId, command } = payload ?? {};
-        console.log(`[WS] PTZ_CONTROL → camera=${cameraId} command=${JSON.stringify(command)}`);
+        logger.info({ cameraId, command }, 'PTZ_CONTROL received');
         // Acknowledge back to sender
         safeSend(ws, {
           type: 'PTZ_ACK',
@@ -159,7 +160,7 @@ export function createWsServer(config, httpServer) {
       case 'ACKNOWLEDGE_ALERT': {
         const { alertId, user, comment } = payload ?? {};
         acknowledgedAlerts.set(alertId, { alertId, user, comment, ack_time: new Date().toISOString() });
-        console.log(`[WS] Alert acknowledged: ${alertId} by ${user}`);
+        logger.info({ alertId, user }, 'Alert acknowledged');
         broadcast({
           type: 'ALERT_ACKNOWLEDGED',
           payload: { alertId, user, comment, timestamp: new Date().toISOString() }
@@ -173,10 +174,10 @@ export function createWsServer(config, httpServer) {
         if (Array.isArray(filters) && filters.length > 0) {
           subs.clear();
           filters.forEach((f) => subs.add(f));
-          console.log(`[WS] Client ${ws._clientId} subscribed to: ${filters.join(', ')}`);
+          logger.info({ clientId: ws._clientId, filters }, 'Client subscribed to modalities');
         } else {
           subs.clear(); // subscribe to all
-          console.log(`[WS] Client ${ws._clientId} subscribed to: ALL`);
+          logger.info({ clientId: ws._clientId }, 'Client subscribed to ALL');
         }
         safeSend(ws, {
           type: 'SUBSCRIBE_ACK',
@@ -196,7 +197,7 @@ export function createWsServer(config, httpServer) {
         ws.send(JSON.stringify(message));
       }
     } catch (err) {
-      console.error('[WS] safeSend error:', err.message);
+      logger.error({ err: err.message }, 'safeSend error');
     }
   }
 

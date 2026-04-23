@@ -12,10 +12,11 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { faker } from '@faker-js/faker';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 import { correlator } from '../correlator.js';
 import { registerSensor, updateSensorReading } from '../restServer.js';
 import { config as appConfig } from '../index.js';
+import { logger } from '../logger.js';
 
 const STATUSES = ['ONLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'DEGRADED', 'MAINTENANCE'];
 
@@ -142,11 +143,11 @@ export class BaseGenerator {
         // Update REST sensor registry
         updateSensorReading(this.sensorId, payload);
       } catch (err) {
-        console.error(`[${this.constructor.name}] Tick error (${this.sensorId}):`, err.message);
+        logger.error({ sensorId: this.sensorId, err: err.message }, `${this.constructor.name} tick error`);
       }
     }, this.intervalMs);
 
-    console.log(`[${this.constructor.name}] Started: ${this.sensorId} @ ${this.intervalMs}ms`);
+    logger.info({ sensorId: this.sensorId, intervalMs: this.intervalMs }, `${this.constructor.name} started`);
   }
 
   stop() {

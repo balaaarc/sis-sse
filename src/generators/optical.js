@@ -25,7 +25,7 @@
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 // Frame dimensions for synthetic video
 const FRAME_W = 320;
@@ -83,7 +83,7 @@ function clearTrack(key) {
   trackRegistry.delete(key);
 }
 
-export default class OpticalGenerator extends BaseGenerator {
+export class OpticalGenerator extends BaseGenerator {
   #ptzPan  = Math.random() * 360;
   #ptzTilt = (Math.random() - 0.5) * 90;
   #ptzZoom = 1.0 + Math.random() * 3;

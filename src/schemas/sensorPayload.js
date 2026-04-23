@@ -286,5 +286,3 @@ export const rawValueSchemas = {
   }
 };
 
-// Default export for convenience
-export default sensorPayloadSchema;

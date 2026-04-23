@@ -14,11 +14,11 @@
  */
 
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 const CLASSIFICATIONS = ['HUMAN_FOOTFALL', 'VEHICLE', 'ANIMAL', 'MACHINERY', 'NOISE'];
 
-export default class SeismicGenerator extends BaseGenerator {
+export class SeismicGenerator extends BaseGenerator {
   #waveformBuffer = new Array(100).fill(0);
 
   constructor(opts) {

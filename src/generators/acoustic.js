@@ -12,13 +12,13 @@
  */
 
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 const CLASSIFICATIONS = [
   'GUNSHOT', 'VEHICLE', 'HUMAN_VOICE', 'ANIMAL', 'MACHINERY', 'EXPLOSION', 'AMBIENT'
 ];
 
-export default class AcousticGenerator extends BaseGenerator {
+export class AcousticGenerator extends BaseGenerator {
   constructor(opts) {
     super({ noiseSigma: 0.03, ...opts });
   }

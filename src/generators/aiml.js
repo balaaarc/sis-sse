@@ -11,8 +11,9 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 import { addAlert } from '../restServer.js';
+import { logger } from '../logger.js';
 
 // Synthetic Sundarbans bounding box (SEC-007)
 const LAT_MIN = 21.5, LAT_MAX = 22.5;
@@ -94,7 +95,7 @@ class TrackPool {
 
 // ── AimlGenerator ────────────────────────────────────────────────────────────
 
-export default class AimlGenerator {
+export class AimlGenerator {
   #trackPool = new TrackPool();
 
   /**
@@ -150,7 +151,7 @@ export default class AimlGenerator {
       if (det) wsServer.broadcast({ type: 'AIML_DETECTION', payload: det });
     }, 500);
 
-    console.log('[AimlGenerator] Started: THREAT_ASSESSMENT@5s, TRACK_UPDATE@1s, DETECTION@500ms');
+    logger.info('AimlGenerator started: THREAT_ASSESSMENT@5s, TRACK_UPDATE@1s, DETECTION@500ms');
   }
 
   // ── Builders ─────────────────────────────────────────────────────────────

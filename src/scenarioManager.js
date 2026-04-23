@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { logger } from './logger.js';
 
 const VALID_SCENARIOS = [
   'NORMAL',
@@ -26,7 +27,7 @@ class ScenarioManager extends EventEmitter {
     const previous = this.#scenario;
     this.#scenario = name;
     this.#changedAt = Date.now();
-    console.log(`[ScenarioManager] Scenario changed: ${previous} → ${name}`);
+    logger.info({ previous, current: name }, 'Scenario changed');
     this.emit('scenario_change', { previous, current: name, timestamp: new Date().toISOString() });
   }
 
@@ -48,5 +49,4 @@ class ScenarioManager extends EventEmitter {
 }
 
 // Export as singleton
-const scenarioManager = new ScenarioManager();
-export default scenarioManager;
+export const scenarioManager = new ScenarioManager();

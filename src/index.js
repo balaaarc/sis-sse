@@ -13,7 +13,8 @@ import http from 'http';
 
 import { createWsServer } from './wsServer.js';
 import { createRestServer } from './restServer.js';
-import scenarioManager from './scenarioManager.js';
+import { scenarioManager } from './scenarioManager.js';
+import { logger } from './logger.js';
 
 // ── Resolve config ──────────────────────────────────────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,20 +26,20 @@ const PORT = parseInt(process.env.PORT ?? config.ws_port ?? 4000, 10);
 const httpServer = http.createServer();
 
 // ── Generators ──────────────────────────────────────────────────────────────
-import SeismicGenerator   from './generators/seismic.js';
-import AcousticGenerator  from './generators/acoustic.js';
-import OpticalGenerator   from './generators/optical.js';
-import RadarGenerator     from './generators/radar.js';
-import MagneticGenerator  from './generators/magnetic.js';
-import ChemicalGenerator  from './generators/chemical.js';
-import FibreGenerator     from './generators/fibre.js';
-import AimlGenerator      from './generators/aiml.js';
+import { SeismicGenerator }   from './generators/seismic.js';
+import { AcousticGenerator }  from './generators/acoustic.js';
+import { OpticalGenerator }   from './generators/optical.js';
+import { RadarGenerator }     from './generators/radar.js';
+import { MagneticGenerator }  from './generators/magnetic.js';
+import { ChemicalGenerator }  from './generators/chemical.js';
+import { FibreGenerator }     from './generators/fibre.js';
+import { AimlGenerator }      from './generators/aiml.js';
 
 // ── Correlator ──────────────────────────────────────────────────────────────
 import { correlator } from './correlator.js';
 
 async function main() {
-  console.log('[SSE] Starting IINVSYS Sensor Simulation Engine...');
+  logger.info('Starting IINVSYS Sensor Simulation Engine...');
 
   // Initialise scenario
   scenarioManager.setScenario(config.default_scenario);
@@ -48,9 +49,6 @@ async function main() {
 
   // Attach REST server (Fastify) to shared HTTP server
   const restServer = await createRestServer(config, wsServer, httpServer);
-
-  // Expose wsServer globally so generators can broadcast
-  global.__wss = wsServer;
 
   // ── Instantiate generators ─────────────────────────────────────────────
   const site = config.sites[0];
@@ -113,9 +111,9 @@ async function main() {
   // Start the shared HTTP server (serves both WebSocket upgrades and REST)
   await new Promise((resolve) => httpServer.listen(PORT, '0.0.0.0', resolve));
 
-  console.log(`[SSE] Server listening on port ${PORT} (WS + REST on single port)`);
-  console.log(`[SSE] Active scenario: ${scenarioManager.getScenario()}`);
-  console.log('[SSE] All generators started. SSE is running.');
+  logger.info(`Server listening on port ${PORT} (WS + REST on single port)`);
+  logger.info(`Active scenario: ${scenarioManager.getScenario()}`);
+  logger.info('All generators started. SSE is running.');
 }
 
 // ── System health builder ────────────────────────────────────────────────────
@@ -153,6 +151,6 @@ function buildSystemHealth(site) {
 }
 
 main().catch((err) => {
-  console.error('[SSE] Fatal startup error:', err);
+  logger.error(err, 'Fatal startup error');
   process.exit(1);
 });

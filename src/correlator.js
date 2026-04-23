@@ -11,7 +11,8 @@
 
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
-import scenarioManager from './scenarioManager.js';
+import { scenarioManager } from './scenarioManager.js';
+import { logger } from './logger.js';
 
 // Correlation rules per scenario: required modalities
 const CORRELATION_RULES = {
@@ -111,7 +112,7 @@ class Correlator extends EventEmitter {
       correlation_window_ms: CORRELATION_WINDOW_MS
     };
 
-    console.log(`[Correlator] Correlated event: ${threatLevel} (score=${threatScore}) scenario=${scenario}`);
+    logger.info({ threatLevel, threatScore, scenario }, 'Correlated event');
     this.emit('correlated_event', event);
   }
 }

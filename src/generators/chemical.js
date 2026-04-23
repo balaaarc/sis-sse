@@ -11,12 +11,12 @@
  */
 
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 const ALL_COMPOUNDS  = ['RDX', 'TNT', 'PETN', 'NH4NO3'];
 const EXPLOSIVE_PAIR = ['RDX', 'TNT', 'PETN'];
 
-export default class ChemicalGenerator extends BaseGenerator {
+export class ChemicalGenerator extends BaseGenerator {
   // Detector operating temperature drifts slowly around 35°C
   #detectorTemp = 33 + Math.random() * 5;
 

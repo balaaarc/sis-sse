@@ -23,7 +23,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 // Synthetic Sundarbans bounding box
 const LAT_MIN = 21.5, LAT_MAX = 22.5;
@@ -58,7 +58,7 @@ class TrackStore {
   }
 }
 
-export default class RadarGenerator extends BaseGenerator {
+export class RadarGenerator extends BaseGenerator {
   // GMTI-specific state
   #trackStore = new TrackStore();
   #trackIds   = [];          // pool of stable IDs for this instance

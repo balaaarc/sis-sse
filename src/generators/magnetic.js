@@ -14,11 +14,11 @@
  */
 
 import { BaseGenerator } from './base.js';
-import scenarioManager from '../scenarioManager.js';
+import { scenarioManager } from '../scenarioManager.js';
 
 const EMI_CLASSES = ['METAL', 'WIRE', 'CLEAR'];
 
-export default class MagneticGenerator extends BaseGenerator {
+export class MagneticGenerator extends BaseGenerator {
   // Slow-drifting earth background field (nT)
   #baselineNt = 48000 + (Math.random() - 0.5) * 2000;  // ~48 000 nT typical
 
